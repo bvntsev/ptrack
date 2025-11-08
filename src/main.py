@@ -1,4 +1,6 @@
 import subprocess
+import time
+import json
 
 def get_active_window_info():
     try:
@@ -23,12 +25,18 @@ def get_active_window_info():
 
         return app, title
     except Exception:
-        return None
+        return None, None
 
 from time import sleep
 
 if __name__ == '__main__':
+    
+
+    
+    jstream = json.json()
+
+
     while True:
-        print(get_active_window_info())
+        app, title = get_active_window_info()
         sleep(1)
 
