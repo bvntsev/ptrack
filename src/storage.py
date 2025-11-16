@@ -1,6 +1,5 @@
 import sqlite3
 import os
-# import json
 
 
 DB_NAME = "data.db"
@@ -8,8 +7,17 @@ ABS_PATH_TO_DB_FOLDER = f'/home/{os.getlogin()}/.local/share/ptrack'
 ABS_PATH_TO_DB_FILE = f'{ABS_PATH_TO_DB_FOLDER}/{DB_NAME}'
 
 
+def close_db(
+    con: sqlite3.connect(), cur: sqlite3.connect().cursor()
+):
+    print("close_db")
+    con.commit()
+    con.close()
+    print("close_db closed")
+
+
 def create_db(abs_path_to_file: str):
-    print("open_bd")
+    print("create_db")
     try:
         con = sqlite3.connect(abs_path_to_file)
     except sqlite3.OperationalError:
@@ -20,16 +28,38 @@ def create_db(abs_path_to_file: str):
 
     cur = con.cursor()
     if cur.execute(
-        "SELECT name FROM sqlite_master WHERE name='ptrack'"
+        "SELECT name FROM sqlite_master WHERE name = 'ptrack'"
     ).fetchone() is None:
         cur.execute("CREATE TABLE ptrack(date, name, title, time)")
         con.commit()
+    print("create db closed")
     return con, cur
 
 
-def get_json_from_db_data(  # REWRITE ( UNREADABLE CODE, EXCEPTION )
+def get_json_from_specific_db_data(
     con: sqlite3.connect(), cur: sqlite3.connect().cursor(), date: str
 ):
+    print("get_json_from_specific_db_data")
+    _json = dict({date: [0, dict()]})
+    # date, name, title, time
+    for row in cur.execute(f'SELECT * FROM ptrack WHERE date IS \'{date}\''):
+        if row[1] not in _json[row[0]][-1].keys():
+            _json[row[0]][-1].update({row[1]: [0, dict()]})
+        _json[row[0]][-1][row[1]][0] =\
+            int(row[3]) + (_json[row[0]][1][row[1]])[0]
+        _json[row[0]][0] += int(row[-1])
+        _json[row[0]][-1][row[1]][-1].update({row[2]: int(row[3])})
+
+    print("JSON was exported from db")
+
+    print("get_json_from_specific_db_data closed")
+    return _json
+
+
+def get_json_from_all_db_data(  # REWRITE ( UNREADABLE CODE, EXCEPTION )
+    con: sqlite3.connect(), cur: sqlite3.connect().cursor()
+):
+    print("get_json_from_all_db_data")
     _json = dict()
     # date, name, title, time
     for row in cur.execute('SELECT * FROM ptrack'):
@@ -44,45 +74,62 @@ def get_json_from_db_data(  # REWRITE ( UNREADABLE CODE, EXCEPTION )
         _json[row[0]][-1][row[1]][-1].update({row[2]: int(row[3])})
 
     print("JSON was exported from db")
+
+    print("get_json_from_all_db_data closed")
     return _json
 
 
 def update_all_db(  # REWRITE ( UNREADABLE CODE, EXCEPTION )
     con: sqlite3.connect(), cur: sqlite3.connect().cursor(), _json: dict()
 ):
+    print("update_all_db")
     for date in _json.keys():
-        sum_all_title = sum([int(x[-1]) for x in cur.execute(f'''\
-SELECT * FROM ptrack WHERE date = \'{_json[date][0]}\' AND name = \'{date}\'\
-            ''')])
-        if _json[date][0] == sum_all_title:
+        sum_all_name = sum([int(x[-1]) for x in cur.execute(f'''
+SELECT * FROM ptrack WHERE date = \'{date}\'''')])
+        if _json[date][0] == sum_all_name:
             continue
         for name in _json[date][-1].keys():
             for title in _json[date][-1][name][-1].keys():
                 # print(f'iter {date} {name} {title}')  # debug
-                if _json[date][-1][name][-1][title] != cur.execute(f'\
+                sql_request = cur.execute('''
             SELECT * FROM ptrack WHERE\
-            date IS \'{date}\' AND name IS \'{name}\' AND title IS \'{title}\''
-                ).fetchone()[-1]:
-                    # print(f'Changed {date} {name} {title}')  # debug
-                    cur.execute(f'\
-            UPDATE ptrack SET time = {_json[date][-1][name][-1][title]} WHERE\
-            date = \'{date}\' AND name = \'{name}\' AND title = \'{title}\'')
+            date IS ? AND name IS ? AND title IS ?
+            ''', (date, name, title)).fetchone()
+                if not sql_request:
+                    cur.execute(
+                        '''INSERT INTO ptrack VALUES (?, ?, ?, ?)''',
+                        (date, name, title, _json[date][1][name][1][title]))
+                elif _json[date][-1][name][-1][title] != sql_request[-1]:
+                    cur.execute('''UPDATE ptrack SET time = ?
+                    WHERE date = ? AND name = ? AND title = ? ''',
+                    (_json[date][-1][name][-1][title], date, name, title))
         con.commit()
+    print("update_all_db closed")
 
 
-# def json_add_new_title(_json: dict, _row: Row):  # FIX
-#     _json[_row.name][-1].append([_row.title, _row.title_time])
-#     _json[_row.name][1] += _row.title_time
-#     return _json
+# _json[date][1][name][1][title]
+def json_add_title(
+    _json: dict, date: str, name: str, title: str, title_time: int
+):
+    print("json_add_title")
+    if title not in _json[date][1][name][1].keys():
+        _json[date][1][name][1].update({title: title_time})
+    _json[date][0] += title_time
+    _json[date][1][name][0] += title_time
+
+    print("json_add_title closed")
+    return _json
 
 
-# def json_add_new_row(_json: dict, _row: Row):  # FIX
-#     _json[_row.name] =\
-#         [_row.date, _row.title_time, [_row.title, _row.title_time]]
-#     return _json
-
-
-# def json_update(
-#     name: str, date: str, total_time: int, title: str, title_time: int
-# ):
-#     pass
+def json_add_name(
+    _json: dict, date: str, name: str, title: str, title_time: int
+):
+    print("json_add_name")
+    if date not in _json.keys():
+        _json.update({date: [0, dict()]})
+    if name not in _json[date][1].keys():
+        _json[date][1].update({name: [title_time, dict()]})
+    _json[date][1][name][1].update({title: title_time})
+    _json[date][0] += title_time
+    print("json_add_name closed")
+    return _json
