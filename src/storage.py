@@ -86,7 +86,7 @@ def update_all_db(  # REWRITE ( UNREADABLE CODE, EXCEPTION )
     for date in _json.keys():
         sum_all_name = sum([int(x[-1]) for x in cur.execute(f'''
 SELECT * FROM ptrack WHERE date = \'{date}\'''')])
-        if _json[date][0] == sum_all_name:
+        if _json[date][0] == sum_all_name and len(_json[date][-1].keys()) != 1:
             continue
         for name in _json[date][-1].keys():
             for title in _json[date][-1][name][-1].keys():
@@ -96,13 +96,18 @@ SELECT * FROM ptrack WHERE date = \'{date}\'''')])
             date IS ? AND name IS ? AND title IS ?
             ''', (date, name, title)).fetchone()
                 if not sql_request:
+                    # print("INSERT====")
                     cur.execute(
                         '''INSERT INTO ptrack VALUES (?, ?, ?, ?)''',
                         (date, name, title, _json[date][1][name][1][title]))
-                elif _json[date][-1][name][-1][title] != sql_request[-1]:
-                    cur.execute('''UPDATE ptrack SET time = ?
-                    WHERE date = ? AND name = ? AND title = ? ''',
-                    (_json[date][-1][name][-1][title], date, name, title))
+                    continue
+                # print("UPDATE====")
+                cur.execute('''UPDATE ptrack SET time = ?
+                WHERE date = ? AND name = ? AND title = ? ''',
+                ((_json[date][-1][name][-1][title] if
+                  _json[date][-1][name][-1][title] > sql_request[-1]
+                  else _json[date][-1][name][-1][title] + sql_request[-1]),
+                 date, name, title))
         con.commit()
     print("update_all_db closed")
 
@@ -132,4 +137,7 @@ def json_add_name(
     _json[date][1][name][1].update({title: title_time})
     _json[date][0] += title_time
     print("json_add_name closed")
+
+    if (title and title_time):
+        return json_add_title(_json, date, name, title, title_time)
     return _json

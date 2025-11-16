@@ -6,4 +6,6 @@
 - Renaming arguments  
 - Rewrite json import functions ( merge to one func )  
 - Fix unreadable code  
-- Make gui client (with graph from matplotlib)
+- Make gui client (with graph from matplotlib)  
+- Make systemd service
+- clean json data from RAM if don't used too long

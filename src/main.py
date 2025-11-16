@@ -34,7 +34,8 @@ if __name__ == '__main__':
     current_date = datetime.date.today().strftime("%d.%m.%Y")
     con, cur = storage.create_db(storage.ABS_PATH_TO_DB_FILE)
     beginning_time = time()
-    json = storage.get_json_from_specific_db_data(con, cur, current_date)
+
+    json = dict({current_date: [0, dict()]})
     while True:
         app_name, title = get_active_window_info()
         if {app_name, title} == {None, None}:
@@ -54,4 +55,5 @@ if __name__ == '__main__':
                 beginning_time = time()
                 print(f'db update[{datetime.datetime.now().isoformat()}]')
                 storage.update_all_db(con, cur, json)
+                json = dict({current_date: [0, dict()]})
         sleep(1)
